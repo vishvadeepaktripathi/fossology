@@ -68,9 +68,13 @@ void writeMessageAfterDelete(char *kind, long id, char *user_name, int returnedC
   {
     fprintf(stdout, "The %s '%ld' is deleted by the user '%s'.\n", kind, id, user_name);
   }
+  else if (2 == returnedCode)
+  {
+    fprintf(stdout, "The %s '%ld' could not be found by the user '%s'.\n", kind, id, user_name);
+  }
   else
   {
-    LOG_FATAL("User '%s' does not have the permsssion to delete the %s '%ld', or the %s '%ld' does not exist.\n", user_name, kind, id, kind, id);
+    fprintf(stdout, "Deletion failed: user '%s' does not have the permsssion to delete the %s '%ld', or the %s '%ld' does not exist.\n", user_name, kind, id, kind, id);
     exit(returnedCode);
   }
 }
@@ -79,7 +83,7 @@ void writeMessageAfterDelete(char *kind, long id, char *user_name, int returnedC
  * \brief main function for the delagent
  *
  * There are 2 ways to use the delagent agent:
- *   1. Command Line :: delete/list upload from the command line
+ *   1. Command Line :: delete/list upload/folder/license from the command line
  *   2. Agent Based  :: run from the scheduler
  *
  * +-----------------------+
@@ -87,18 +91,18 @@ void writeMessageAfterDelete(char *kind, long id, char *user_name, int returnedC
  * +-----------------------+
  *
  * List or delete uploads.
- *   -h   :: help (print this message), then exit.
- *   -i   :: Initialize the DB
- *   -u   :: List uploads IDs.
- *   -U # :: Delete upload ID.
- *   -L # :: Delete ALL licenses associated with upload ID.
- *   -f   :: List folder IDs.
- *   -F # :: Delete folder ID and all uploads under this folder.
- *   -T   :: TEST -- do not update the DB or delete any files (just pretend).
- *   -v   :: Verbose (-vv for more verbose).
- *   -V   :: print the version info, then exit.
+ *   -h            :: help (print this message), then exit.
+ *   -i            :: Initialize the DB
+ *   -u            :: List uploads IDs.
+ *   -U #          :: Delete upload ID.
+ *   -L #          :: Delete ALL licenses associated with upload ID.
+ *   -f            :: List folder IDs.
+ *   -F #          :: Delete folder ID and all uploads under this folder.
+ *   -T            :: TEST -- do not update the DB or delete any files (just pretend).
+ *   -v            :: Verbose (-vv for more verbose).
+ *   -V            :: print the version info, then exit.
  *   -c SYSCONFDIR :: Specify the directory for the system configuration.
- *   --user #  :: user name
+ *   --user #      :: user name
  *   --password #  :: password
  *
  * +----------------------+

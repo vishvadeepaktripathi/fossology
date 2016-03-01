@@ -84,7 +84,9 @@ void PQexecCheckClear(const char *desc, char *SQL, char *file, const int line)
  * \param int *user_id - will be set to the id of the user
  * \param int *user_perm - will be set to the permission level of the user
  *
- * \return 1: yes, valid; -1: failure; 0: invalid
+ * \return 1: yes, valid;
+ *         0: invalid;
+ *        -1: failure
  */
 int authentication(char *user, char *password, int *user_id, int *user_perm)
 {
@@ -142,13 +144,13 @@ int authentication(char *user, char *password, int *user_id, int *user_perm)
  * \param char *user_name - user name
  *
  * \return 1: yes, can be deleted;
- *         0: can not be deleted
+ *         0: can not be deleted;
  *        -1: failure;
- *        -2: does not exist;
+ *        -2: does not exist
  */
 int check_permission_upload(long upload_id, int user_id)
 {
-  char SQL[MAXSQL] = {0};;
+  char SQL[MAXSQL] = {0};
   PGresult *result = NULL;
   int count = 0;
 
@@ -167,7 +169,7 @@ int check_permission_upload(long upload_id, int user_id)
   /* Check Permissions */
   if (GetUploadPerm(db_conn, upload_id, user_id) < PERM_WRITE)
   {
-    LOG_ERROR("You have no update permissions on upload %ld", upload_id);
+    printf("You have no write permissions on upload %ld", upload_id);
     return 0; // can not be deleted
   }
 
@@ -182,7 +184,7 @@ int check_permission_upload(long upload_id, int user_id)
  * \param char *user_name - user name
  *
  * \return 1: yes, can be deleted;
- *         0: can not be deleted
+ *         0: can not be deleted;
  *        -1: failure;
  */
 int check_permission_folder(long folder_id, int user_id, int user_perm)
@@ -195,7 +197,7 @@ int check_permission_folder(long folder_id, int user_id, int user_perm)
   result = PQexec(db_conn, SQL);
   if (fo_checkPQresult(db_conn, result, SQL, __FILE__, __LINE__))
   {
-    exit(-1);
+    return -1;
   }
   count = atol(PQgetvalue(result,0,0));
   if(count == 0){
@@ -212,9 +214,7 @@ int check_permission_folder(long folder_id, int user_id, int user_perm)
  * \param char *user_name - user name
  *
  * \return 1: yes, can be deleted;
- *         0: can not be deleted
- *        -1: failure;
- *        -2: does not exist;
+ *         0: can not be deleted;
  */
 int check_permission_license(long license_id, int user_perm)
 {
@@ -236,7 +236,10 @@ int check_permission_license(long license_id, int user_perm)
  *
  * \param long UploadId the upload id
  *
- * \return 1: success; 0: fail
+ * \return 1: yes, success;
+ *         0: can not be deleted;
+ *        -1: failure;
+ *        -2: does not exist
  */
 int DeleteLicense (long UploadId, int user_perm)
 {
@@ -244,9 +247,10 @@ int DeleteLicense (long UploadId, int user_perm)
   PGresult *result;
   long items=0;
 
-  if (1 != check_permission_license(UploadId, user_perm))
+  int permission_license = check_permission_license(UploadId, user_perm);
+  if (1 != permission_license)
   {
-    return 0;
+    return permission_license;
   }
 
   verbosePrintf("Deleting licenses for upload %ld\n",UploadId);
@@ -301,11 +305,14 @@ int DeleteLicense (long UploadId, int user_perm)
 /**
  * \brief DeleteUpload()
  *
- *  Given an upload ID, delete it.
+*  Given an upload ID, delete it.
  *
  *  param long UploadId the upload id
  *
- * \return 1: success; 0: fail
+ * \return 1: yes, can is deleted;
+ *         0: can not be deleted;
+ *        -1: failure;
+ *        -2: does not exist
  */
 int DeleteUpload (long UploadId, int user_id)
 {
@@ -316,13 +323,9 @@ int DeleteUpload (long UploadId, int user_id)
   char SQL[MAXSQL], desc[myBUFSIZ];
 
   int permission_upload = check_permission_upload(UploadId, user_id);
-  if (permission_upload == -2)
+  if(1 != permission_upload)
   {
-    return 1;
-  }
-  else if (1 != permission_upload)
-  {
-    return 0;
+    return permission_upload;
   }
 
   snprintf(TempTable,sizeof(TempTable),"DelUp_%ld_pfile",UploadId);
@@ -542,7 +545,8 @@ int UnlinkContent (long child, long parent, int mode, int user_id, int user_perm
  * \param long Row grandparent (used to unlink if multiple grandparents)
  * \param int DelFlag 0=no del, 1=del if unique parent, 2=del unconditional
  *
- * \return 1: success; 0: fail
+ * \return 1: success;
+ *         0: fail
  *
  */
 int ListFoldersRecurse (long Parent, int Depth, long Row, int DelFlag, int user_id, int user_perm)
@@ -601,8 +605,12 @@ int ListFoldersRecurse (long Parent, int Depth, long Row, int DelFlag, int user_
         printf("\n");
       }
       rc = ListFoldersRecurse(Fid,Depth+1,Parent,DelFlag,user_id,user_perm);
-      if (rc == 0)
+      if (rc < 1)
       {
+        if (DelFlag)
+        {
+          printf("Deleting the folder failed.");
+        }
         return 0;
       }
     }
@@ -615,13 +623,15 @@ int ListFoldersRecurse (long Parent, int Depth, long Row, int DelFlag, int user_
       if (DelFlag)
       {
         rc = DeleteUpload(atol(PQgetvalue(result,r,4)),user_id);
-        if (rc == 0)
+        if (rc < 1)
         {
+          printf("Deleting the folder failed since it contains uploads you can't delete.");
           return 0;
         }
       }
       else
       {
+        // TODO: user might not be allowed to see this upload. Check!
         printf("%4s :: Contains: %s\n","--",PQgetvalue(result,r,2));
       }
     }
@@ -631,7 +641,7 @@ int ListFoldersRecurse (long Parent, int Depth, long Row, int DelFlag, int user_
   switch(Parent)
   {
     case 1: /* skip default parent */
-      if (DelFlag!=0)
+      if (DelFlag != 0)
       {
         printf("INFO: Default folder not deleted.\n");
       }
@@ -639,7 +649,7 @@ int ListFoldersRecurse (long Parent, int Depth, long Row, int DelFlag, int user_
     case 0: /* it's an upload */
       break;
     default:  /* it's a folder */
-      if (DelFlag==0)
+      if (DelFlag == 0)
       {
         break;
       }
@@ -647,11 +657,10 @@ int ListFoldersRecurse (long Parent, int Depth, long Row, int DelFlag, int user_
       if (DelFlag==1)
       {
         rc = UnlinkContent(Parent,Row,1,user_id,user_perm);
-        if (rc == 0)
+        if (rc == 1)
         {
-          return 0;
+          break;
         }
-        break;
       }
       snprintf(SQL,MAXSQL,"DELETE FROM foldercontents WHERE foldercontents_mode=1 AND child_id=%ld",Parent);
       if (Test)
@@ -783,7 +792,7 @@ void ListFolders (int user_id, int user_perm)
   PGresult *result;
 
   if(user_perm == 0){
-    LOG_FATAL("user does not have the permsssion to view the folder list.\n");
+    printf("you do not have the permsssion to view the folder list.\n");
     exit(-1);
   }
 
@@ -862,7 +871,8 @@ void ListUploads (int user_id, int user_perm)
  *
  * \param long FolderId the fold id to delete
  *
- * \return 1: success; 0: fail
+ * \return 1: success;
+ *         0: fail
  *
  **/
 int DeleteFolder(long FolderId, int user_id, int user_perm)
@@ -880,7 +890,10 @@ int DeleteFolder(long FolderId, int user_id, int user_perm)
  *
  * \param char *Parm the parameter string
  *
- * \return 0 on OK, -1 on failure.
+ * \return 1: yes, can is deleted;
+ *         0: can not be deleted;
+ *        -1: failure;
+ *        -2: does not exist
  *
  **/
 int ReadAndProcessParameter (char *Parm, int user_id, int user_perm)
@@ -957,7 +970,7 @@ int ReadAndProcessParameter (char *Parm, int user_id, int user_perm)
   }
   else
   {
-    LOG_FATAL("Unknown command: '%s'\n",Parm);
+    LOG_ERROR("Unknown command: '%s'\n",Parm);
   }
 
   return(rc);
