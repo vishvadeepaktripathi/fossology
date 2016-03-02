@@ -24,7 +24,7 @@
  */
 #include "delagent.h"
 
-int Verbose = 1;
+int Verbose = 0;
 int Test = 0;
 PGconn* db_conn = NULL;        // the connection to Database
 
