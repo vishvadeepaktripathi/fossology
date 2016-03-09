@@ -148,7 +148,7 @@ int authentication(char *user, char *password, int *user_id, int *user_perm)
  *        -1: failure;
  *        -2: does not exist
  */
-int check_permission_upload(long upload_id, int user_id)
+int check_permission_upload(int wantedPermissions, long upload_id, int user_id)
 {
   char SQL[MAXSQL] = {0};
   PGresult *result = NULL;
@@ -167,13 +167,23 @@ int check_permission_upload(long upload_id, int user_id)
   }
 
   /* Check Permissions */
-  if (GetUploadPerm(db_conn, upload_id, user_id) < PERM_WRITE)
+  if (GetUploadPerm(db_conn, upload_id, user_id) < wantedPermissions)
   {
     printf("You have no write permissions on upload %ld", upload_id);
     return 0; // can not be deleted
   }
 
   return 1; // can be deleted
+}
+
+int check_read_permission_upload(long upload_id, int user_id)
+{
+  return check_permission_upload(PERM_READ, upload_id, user_id);
+}
+
+int check_write_permission_upload(long upload_id, int user_id)
+{
+  return check_permission_upload(PERM_WRITE, upload_id, user_id);
 }
 
 /**
@@ -322,7 +332,7 @@ int DeleteUpload (long UploadId, int user_id)
   PGresult *result, *pfile_result;
   char SQL[MAXSQL], desc[myBUFSIZ];
 
-  int permission_upload = check_permission_upload(UploadId, user_id);
+  int permission_upload = check_write_permission_upload(UploadId, user_id);
   if(1 != permission_upload)
   {
     return permission_upload;
@@ -584,18 +594,15 @@ int ListFoldersRecurse (long Parent, int Depth, long Row, int DelFlag, int user_
       continue;
     }
 
-    if (!DelFlag)
-    {
-      for(i=0; i<Depth; i++)
-      {
-        fputs("   ",stdout);
-      }
-    }
     Fid = atol(PQgetvalue(result,r,0));
     if (Fid != 0)
     {
       if (!DelFlag)
       {
+        for(i=0; i<Depth; i++)
+        {
+          fputs("   ",stdout);
+        }
         printf("%4ld :: %s",Fid,PQgetvalue(result,r,2));
         Desc = PQgetvalue(result,r,3);
         if (Desc && Desc[0])
@@ -631,8 +638,14 @@ int ListFoldersRecurse (long Parent, int Depth, long Row, int DelFlag, int user_
       }
       else
       {
-        // TODO: user might not be allowed to see this upload. Check!
-        printf("%4s :: Contains: %s\n","--",PQgetvalue(result,r,2));
+        if (check_read_permission_upload(atol(PQgetvalue(result,r,4)), user_id) == 1)
+        {
+          for(i=0; i<Depth; i++)
+          {
+            fputs("   ",stdout);
+          }
+          printf("%4s :: Contains: %s\n","--",PQgetvalue(result,r,2));
+        }
       }
     }
   }
