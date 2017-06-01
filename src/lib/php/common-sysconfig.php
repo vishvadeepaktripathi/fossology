@@ -1,20 +1,21 @@
 <?php
 /***********************************************************
- Copyright (C) 2011-2015 Hewlett-Packard Development Company, L.P.
+Copyright (C) 2011-2015 Hewlett-Packard Development Company, L.P.
+Copyright (C) 2017 Siemens AG
 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License version 2.1 as published by the Free Software Foundation.
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License version 2.1 as published by the Free Software Foundation.
 
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
 
- You should have received a copy of the GNU Lesser General Public License
- along with this library; if not, write to the Free Software Foundation, Inc.0
- 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-***********************************************************/
+You should have received a copy of the GNU Lesser General Public License
+along with this library; if not, write to the Free Software Foundation, Inc.0
+51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ ***********************************************************/
 
 /**
  * \file common-sysconfig.php
@@ -26,11 +27,12 @@
 define("CONFIG_TYPE_INT", 1);
 define("CONFIG_TYPE_TEXT", 2);
 define("CONFIG_TYPE_TEXTAREA", 3);
+define("CONFIG_TYPE_PASSWORD", 4);
 //}@
 
 
 /**
- * \brief Initialize the fossology system after bootstrap().  
+ * \brief Initialize the fossology system after bootstrap().
  * This function also opens a database connection (global PG_CONN).
  *
  * System configuration variables are in four places:
@@ -40,7 +42,7 @@ define("CONFIG_TYPE_TEXTAREA", 3);
  *  - Database sysconfig table
  *
  * VERSION and fossology.conf variables are organized by group.  For example,
- * [DIRECTORIES] 
+ * [DIRECTORIES]
  *   REPODIR=/srv/mydir
  *
  * but the sysconfig table and Db.conf are not.  So all the table values will be put in
@@ -49,7 +51,7 @@ define("CONFIG_TYPE_TEXTAREA", 3);
  *
  * \param $sysconfdir - path to SYSCONFDIR
  * \param $SysConf - configuration variable array (updated by this function)
- * 
+ *
  * If the sysconfig table doesn't exist then create it.
  * Write records for the core variables into sysconfig table.
  *
@@ -60,7 +62,7 @@ define("CONFIG_TYPE_TEXTAREA", 3);
  *  -  $SysConf[VERSION][COMMIT_HASH] => "4467M"
  *
  * \Note Since so many files expect directory paths that used to be in pathinclude.php
- * to be global, this function will define the same globals (everything in the 
+ * to be global, this function will define the same globals (everything in the
  * DIRECTORIES section of fossology.conf).
  */
 function ConfigInit($sysconfdir, &$SysConf)
@@ -71,7 +73,7 @@ function ConfigInit($sysconfdir, &$SysConf)
   $VersionFile = "{$sysconfdir}/VERSION";
   $VersionConf = parse_ini_file($VersionFile, true);
 
-  /* Add this file contents to $SysConf, then destroy $VersionConf 
+  /* Add this file contents to $SysConf, then destroy $VersionConf
    * This file can define its own groups and is eval'd.
    */
   foreach($VersionConf as $GroupName=>$GroupArray)
@@ -88,7 +90,7 @@ function ConfigInit($sysconfdir, &$SysConf)
   $dbPath = "{$sysconfdir}/Db.conf";
   $dbConf = parse_ini_file($dbPath, true);
 
-  /* Add this file contents to $SysConf, then destroy $dbConf 
+  /* Add this file contents to $SysConf, then destroy $dbConf
    * This file can define its own groups and is eval'd.
    */
   foreach($dbConf as $var=>$val) $SysConf['DBCONF'][$var] = $val;
@@ -101,8 +103,7 @@ function ConfigInit($sysconfdir, &$SysConf)
   $PG_CONN = DBconnect($sysconfdir);
 
   global $container;
-  $postgresDriver = new \Fossology\Lib\Db\Driver\Postgres($PG_CONN);
-  $container->get('db.manager')->setDriver($postgresDriver);
+  $container->get('db.manager')->setDriver(new \Fossology\Lib\Db\Driver\Postgres($PG_CONN));
 
   /**************** read/create/populate the sysconfig table *********/
   /* create if sysconfig table if it doesn't exist */
@@ -198,31 +199,57 @@ function Populate_sysconfig()
   $SupportEmailLabelPrompt = _('Support Email Label');
   $SupportEmailLabelDesc = _('e.g. "Support"<br>Text that the user clicks on to create a new support email. This new email will be preaddressed to this support email address and subject.  HTML is ok.');
   $ValueArray[$Variable] = "'$Variable', 'Support', '$SupportEmailLabelPrompt',"
-  . CONFIG_TYPE_TEXT .
-                    ",'Support', 1, '$SupportEmailLabelDesc', ''";
+    . CONFIG_TYPE_TEXT .
+    ",'Support', 1, '$SupportEmailLabelDesc', ''";
 
   $Variable = "SupportEmailAddr";
   $SupportEmailAddrPrompt = _('Support Email Address');
   $SupportEmailAddrValid = "check_email_address";
   $SupportEmailAddrDesc = _('e.g. "support@mycompany.com"<br>Individual or group email address to those providing FOSSology support.');
   $ValueArray[$Variable] = "'$Variable', null, '$SupportEmailAddrPrompt', "
-  . CONFIG_TYPE_TEXT .
-                    ",'Support', 2, '$SupportEmailAddrDesc', '$SupportEmailAddrValid'";
+    . CONFIG_TYPE_TEXT .
+    ",'Support', 2, '$SupportEmailAddrDesc', '$SupportEmailAddrValid'";
 
   $Variable = "SupportEmailSubject";
   $SupportEmailSubjectPrompt = _('Support Email Subject line');
   $SupportEmailSubjectDesc = _('e.g. "fossology support"<br>Subject line to use on support email.');
   $ValueArray[$Variable] = "'$Variable', 'FOSSology Support', '$SupportEmailSubjectPrompt',"
-  . CONFIG_TYPE_TEXT .
-                    ",'Support', 3, '$SupportEmailSubjectDesc', ''";
+    . CONFIG_TYPE_TEXT .
+    ",'Support', 3, '$SupportEmailSubjectDesc', ''";
+
+  /* openID Service */
+  $Variable = "ProviderName";
+  $OpenIDProviderNamePrompt = _('OpenID Connect Provider Name');
+  $OpenIDProviderNameDesc = _('e.g. "Gitlab"<br>OpenID Connect Provider Name');
+  $ValueArray[$Variable] = "'$Variable', null, '$OpenIDProviderNamePrompt', ". CONFIG_TYPE_TEXT .",'OpenIdConnectSupport', 1, '$OpenIDProviderNameDesc', ''";
+
+  $Variable = "ProviderURL";
+  $OpenIDProviderURLPrompt = _('OpenID Connect Provider URL');
+  $OpenIDProviderDesc = _('e.g. "https://gitlab.com/oauth/authorize"<br>OpenID Connect Provider URL');
+  $ValueArray[$Variable] = "'$Variable', null, '$OpenIDProviderURLPrompt', ". CONFIG_TYPE_TEXT .",'OpenIdConnectSupport', 1, '$OpenIDProviderDesc', ''";
+
+  $Variable = "ClientID";
+  $ClientIDPrompt = _('Client ID');
+  $ClientIDDesc = _('e.g. "cf13476f185b9f4b2e0ec962b52211adbdfc13aa"<br>Client ID generated while registering your application.');
+  $ValueArray[$Variable] = "'$Variable', null, '$ClientIDPrompt',". CONFIG_TYPE_TEXT .",'OpenIdConnectSupport', 2, '$ClientIDDesc', ''";
+
+  $Variable = "ClientSecret";
+  $ClientSecretPrompt = _('Client Secret');
+  $ClientSecretDesc = _('e.g. "cf13476f185b9f4b2e0ec962b52211adbdfc13aa"<br> "Client Secret generated while registering your application."');
+  $ValueArray[$Variable] = "'$Variable', null, '$ClientSecretPrompt',". CONFIG_TYPE_TEXT .",'OpenIdConnectSupport', 3, '$ClientSecretDesc', ''";
+
+  $Variable = "CertPath";
+  $CertPathPrompt = _('Certificate Path');
+  $CertPathDesc = _('e.g. "/path/to/my.cert"<br> "Cert path for fossology, if custom cert(this field is optional)."');
+  $ValueArray[$Variable] = "'$Variable', null, '$CertPathPrompt',". CONFIG_TYPE_TEXT .",'OpenIdConnectSupport', 4, '$CertPathDesc', ''";
 
   /*  Banner Message */
   $Variable = "BannerMsg";
   $BannerMsgPrompt = _('Banner message');
   $BannerMsgDesc = _('This is message will be displayed on every page with a banner.  HTML is ok.');
   $ValueArray[$Variable] = "'$Variable', null, '$BannerMsgPrompt', "
-  . CONFIG_TYPE_TEXTAREA .
-                    ",'Banner', 1, '$BannerMsgDesc', ''";
+    . CONFIG_TYPE_TEXTAREA .
+    ",'Banner', 1, '$BannerMsgDesc', ''";
 
   /*  Logo  */
   $Variable = "LogoImage";
@@ -230,17 +257,17 @@ function Populate_sysconfig()
   $LogoImageValid = "check_logo_image_url";
   $LogoImageDesc = _('e.g. "http://mycompany.com/images/companylogo.png" or "images/mylogo.png"<br>This image replaces the fossology project logo. Image is constrained to 150px wide.  80-100px high is a good target.  If you change this URL, you MUST also enter a logo URL.');
   $ValueArray[$Variable] = "'$Variable', null, '$LogoImagePrompt', "
-  . CONFIG_TYPE_TEXT .
-                    ",'Logo', 1, '$LogoImageDesc', '$LogoImageValid'";
+    . CONFIG_TYPE_TEXT .
+    ",'Logo', 1, '$LogoImageDesc', '$LogoImageValid'";
 
   $Variable = "LogoLink";
   $LogoLinkPrompt = _('Logo URL');
   $LogoLinkDesc = _('e.g. "http://mycompany.com/fossology"<br>URL a person goes to when they click on the logo.  If you change the Logo URL, you MUST also enter a Logo Image.');
   $LogoLinkValid = "check_logo_url";
   $ValueArray[$Variable] = "'$Variable', null, '$LogoLinkPrompt', "
-  . CONFIG_TYPE_TEXT .
-                    ",'Logo', 2, '$LogoLinkDesc', '$LogoLinkValid'" ;
-   
+    . CONFIG_TYPE_TEXT .
+    ",'Logo', 2, '$LogoLinkDesc', '$LogoLinkValid'" ;
+
   $Variable = "FOSSologyURL";
   $URLPrompt = _("FOSSology URL");
   $hostname = exec("hostname -f");
@@ -249,24 +276,40 @@ function Populate_sysconfig()
   $URLDesc = _("URL of this FOSSology server, e.g. $FOSSologyURL");
   $URLValid = "check_fossology_url";
   $ValueArray[$Variable] = "'$Variable', '$FOSSologyURL', '$URLPrompt', "
-  . CONFIG_TYPE_TEXT .
-                    ",'URL', 1, '$URLDesc', '$URLValid'";
+    . CONFIG_TYPE_TEXT .
+    ",'URL', 1, '$URLDesc', '$URLValid'";
 
   $Variable = "NomostListNum";
   $NomosNumPrompt = _("Maximum licenses to List");
   $NomostListNum = "2200";
   $NomosNumDesc = _("For License List and License List Download, you can set the maximum number of lines to list/download. Default 2200.");
   $ValueArray[$Variable] = "'$Variable', '$NomostListNum', '$NomosNumPrompt', "
-  . CONFIG_TYPE_TEXT .
-                    ",'Number', 4, '$NomosNumDesc', null";
+    . CONFIG_TYPE_TEXT .
+    ",'Number', 4, '$NomosNumDesc', null";
 
   $Variable = "ShowJobsAutoRefresh";
   $contextNamePrompt = _("ShowJobs Auto Refresh Time");
   $contextValue = "10";
   $contextDesc = _("No of seconds to refresh ShowJobs");
   $ValueArray[$Variable] = "'$Variable', '$contextValue', '$contextNamePrompt', "
-  . CONFIG_TYPE_TEXT .
-                    ",'Number', null, '$contextDesc', null";
+    . CONFIG_TYPE_TEXT .
+    ",'Number', null, '$contextDesc', null";
+
+  $Variable = "Sw360ServerIpAddress";
+  $contextNamePrompt = _("SW360 Server IP");
+  $contextValue = "127.0.0.1";
+  $contextDesc = _("Current SW360 Server IP Address");
+  $ValueArray[$Variable] = "'$Variable', '$contextValue', '$contextNamePrompt', "
+    . CONFIG_TYPE_TEXT .
+    ",'SW360IpPort', null, '$contextDesc', null";
+
+  $Variable = "Sw360ServerPortAddress";
+  $contextNamePrompt = _("SW360 Server Port");
+  $contextValue = "4085";
+  $contextDesc = _("Current SW360 Server Port Address");
+  $ValueArray[$Variable] = "'$Variable', '$contextValue', '$contextNamePrompt', "
+    . CONFIG_TYPE_TEXT .
+    ",'SW360IpPort', null, '$contextDesc', null";
 
   $Variable = "BlockSizeHex";
   $hexPrompt = _("Chars per page in hex view");
@@ -284,17 +327,17 @@ function Populate_sysconfig()
   $contextValue = "/tmp";
   $contextDesc = _("List of allowed prefixes for upload, separated by \":\" (colon)");
   $ValueArray[$Variable] = "'$Variable', '$contextValue', '$contextNamePrompt', "
-  . CONFIG_TYPE_TEXT .
-                    ",'UploadFromServer', 5, '$contextDesc', null";
+    . CONFIG_TYPE_TEXT .
+    ",'UploadFromServer', 5, '$contextDesc', null";
   $Variable = "UploadFromServerAllowedHosts";
   $contextNamePrompt = _("List of allowed hosts for serverupload");
   $contextValue = "localhost";
   $contextDesc = _("List of allowed hosts for upload, separated by \":\" (colon)");
   $ValueArray[$Variable] = "'$Variable', '$contextValue', '$contextNamePrompt', "
-  . CONFIG_TYPE_TEXT .
-                    ",'UploadFromServer', 5, '$contextDesc', null";
+    . CONFIG_TYPE_TEXT .
+    ",'UploadFromServer', 5, '$contextDesc', null";
 
-  
+
   /* Doing all the rows as a single insert will fail if any row is a dupe.
    So insert each one individually so that new variables get added.
   */
@@ -321,7 +364,7 @@ function Populate_sysconfig()
  * check if the value format is valid,
  * only true/false is valid
  *
- * \param $value - the value which will be checked 
+ * \param $value - the value which will be checked
  *
  * \return 1, if the value is valid, or 0
  */
@@ -341,7 +384,7 @@ function check_boolean($value)
  * \brief validation function check_fossology_url().
  * check if the url is valid,
  *
- * \param $url - the url which will be checked 
+ * \param $url - the url which will be checked
  *
  * \return  1: valid, 0: invalid
  */
@@ -374,7 +417,7 @@ function check_fossology_url($url)
  * \brief validation function check_logo_url().
  * check if the url is available,
  *
- * \param $url - the url which will be checked 
+ * \param $url - the url which will be checked
  *
  * \return 1: available, 0: unavailable
  */
@@ -395,7 +438,7 @@ function check_logo_url($url)
  * \brief validation function check_logo_image_url().
  * check if the url is available,
  *
- * \param $url - the url which will be checked 
+ * \param $url - the url which will be checked
  *
  * \return 1: the url is available, 0: unavailable
  */
@@ -420,7 +463,7 @@ function check_logo_image_url($url)
  * implement this function if needed in the future
  * check if the email address is valid
  *
- * \param $email_address - the email address which will be checked 
+ * \param $email_address - the email address which will be checked
  *
  * \return 1: valid, 0: invalid
  */
@@ -458,7 +501,7 @@ function is_available($url, $timeout = 2, $tries = 2)
 
 /**
  * \brief check if the url is valid
- * \param $url - the url which will be checked 
+ * \param $url - the url which will be checked
  * \return 1: the url is valid, 0: invalid
  */
 function check_url($url)

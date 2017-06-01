@@ -20,6 +20,7 @@ namespace Fossology\UI\Page;
 
 use Fossology\Lib\Plugin\DefaultPlugin;
 use Symfony\Component\HttpFoundation\Request;
+use OpenIDConnectClient;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -59,6 +60,21 @@ class HomePage extends DefaultPlugin
 
       $vars['referrer'] = "?mod=browse";
       $vars['authUrl'] = "?mod=auth";
+    }
+
+    if(isset($_GET['code']))
+    {
+      global $sysConf;
+
+      $oidc = new OpenIDConnectClient($sysConf['PROVIDER_URL'],
+        $sysConf['CLIENT_ID'],
+        $sysConf['CLIENT_SECRET']);
+
+      if($sysConf['CERT_PATH'] != NULL)
+        $oidc->setCertPath($sysConf['CERT_PATH']);
+
+      $oidc->authenticate();
+      $name = $oidc->requestUserInfo('given_name');
     }
 
     return $this->render("home.html.twig", $this->mergeWithDefault($vars));
