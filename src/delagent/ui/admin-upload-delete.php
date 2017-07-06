@@ -19,12 +19,12 @@
 
 use Fossology\Lib\Auth\Auth;
 use Fossology\Lib\Dao\UploadDao;
-
+use \delagent\ui\DeleteMessages;
+use \delagent\ui\DeleteResponse;
 /**
  * \file admin_upload_delete.php
  * \brief delete a upload
  */
-
 define("TITLE_admin_upload_delete", _("Delete Uploaded File"));
 
 /**
@@ -54,25 +54,26 @@ class admin_upload_delete extends FO_Plugin
    *
    * \return string with the message.
    */
-  function TryToDelete($uploadpk) {
+  function TryToDelete($uploadpk)
+  {
     if(!$this->uploadDao->isEditable($uploadpk, Auth::getGroupId())){
-      $text=_("You dont have permissions to delete the upload");
-      return DisplayMessage($text);
+      $returnMessage = DeleteMessages::NO_PERMISSION;
+      return new DeleteResponse($returnMessage);
     }
 
     $rc = $this->Delete($uploadpk);
 
     if (! empty($rc)) {
-      $text=_("Deletion Scheduling failed: ");
-      return DisplayMessage($text.$rc);
+      $returnMessage = DeleteMessages::SCHEDULING_FAILED;
+      return new DeleteResponse($returnMessage);
     }
 
     /* Need to refresh the screen */
     $URL = Traceback_uri() . "?mod=showjobs&upload=$uploadpk ";
     $LinkText = _("View Jobs");
-    $text=_("Deletion added to job queue.");
-    $msg = "$text <a href=$URL>$LinkText</a>";
-    return displayMessage($msg);
+    $returnMessage = DeleteMessages::SUCCESS;
+    return new DeleteResponse($returnMessage,
+      " <a href=$URL>$LinkText</a>");
   }
 
   /**
@@ -114,20 +115,72 @@ class admin_upload_delete extends FO_Plugin
   } // Delete()
 
   /**
+   * @param $uploadpks
+   * @brief starts deletion and handles error messages
+   * @return string
+   */
+  function initDeletion($uploadpks)
+  {
+    $V = "";
+    $errorMessages = [];
+    $deleteResponse = "";
+    for($i=0; $i < sizeof($uploadpks); $i++)
+    {
+      $deleteResponse = $this->TryToDelete($uploadpks[$i]);
+
+      if($deleteResponse->getDeleteMessageCode() != DeleteMessages::SUCCESS)
+      {
+        $errorMessages[] = $deleteResponse;
+      }
+    }
+
+    /**
+     * Output normal message, if only one upload
+     */
+    if(sizeof($uploadpks) < 2)
+    {
+      $V .= DisplayMessage($deleteResponse->getDeleteMessageString().$deleteResponse->getAdditionalMessage());
+    }
+    else
+    {
+      $displayMessage = "";
+
+      if(in_array(DeleteMessages::SCHEDULING_FAILED, $errorMessages))
+      {
+        $displayMessage .= "<br/>Scheduling failed for " .
+          array_count_values($errorMessages)[DeleteMessages::SCHEDULING_FAILED] . " uploads<br/>";
+      }
+
+      if(in_array(DeleteMessages::NO_PERMISSION, $errorMessages))
+      {
+        $displayMessage .= "No permission to delete " .
+          array_count_values($errorMessages)[DeleteMessages::NO_PERMISSION]. " uploads<br/>";
+      }
+
+      $displayMessage .= _("Deletion of ") .
+        (sizeof($uploadpks)-sizeof($errorMessages)) . " projects queued";
+      $V .= DisplayMessage($displayMessage);
+    }
+    return $V;
+  }
+
+  /**
    * \brief Generate the text for this plugin.
    */
   public function Output()
   {
     $V = "";
     /* If this is a POST, then process the request. */
-    $uploadpk = GetParm('upload', PARM_INTEGER);
-    if (!empty($uploadpk)) {
-      $V.= $this->TryToDelete($uploadpk);
+    $uploadpks = GetParm('upload', PARM_RAW);
+    if (!empty($uploadpks))
+    {
+      $V .= $this->initDeletion($uploadpks);
     }
     /* Create the AJAX (Active HTTP) javascript for doing the reply
      and showing the response. */
     $V.= ActiveHTTPscript("Uploads");
     $V.= "<script language='javascript'>\n";
+
     $V.= "function Uploads_Reply()\n";
     $V.= "  {\n";
     $V.= "  if ((Uploads.readyState==4) && (Uploads.status==200))\n";
@@ -161,7 +214,7 @@ class admin_upload_delete extends FO_Plugin
     $V.= "<ol>\n";
     $text = _("Select the folder containing the file to delete: ");
     $V.= "<li>$text";
-    $V.= "<select name='folder' ";
+    $V.= "<select id='folder' name='folder' ";
     $V.= "onLoad='Uploads_Get((\"" . Traceback_uri() . "?mod=upload_options&folder=-1' ";
     $V.= "onChange='Uploads_Get(\"" . Traceback_uri() . "?mod=upload_options&folder=\" + this.value)'>\n";
 
@@ -171,7 +224,7 @@ class admin_upload_delete extends FO_Plugin
     $text = _("Select the uploaded project to delete:");
     $V.= "<li>$text";
     $V.= "<div id='uploaddiv'>\n";
-    $V.= "<BR><select name='upload' size='10'>\n";
+    $V.= "<BR><select multiple='multiple' name='upload[]' size='10'>\n";
     $List = FolderListUploads_perm($root_folder_pk, Auth::PERM_WRITE);
     foreach($List as $L) {
       $V.= "<option value='" . $L['upload_pk'] . "'>";
