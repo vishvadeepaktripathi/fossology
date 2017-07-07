@@ -302,3 +302,8 @@ tr.classic {
   text-align:left;
   background:lightyellow;
 }
+
+#folder_select
+{
+  width: 25%;
+}
