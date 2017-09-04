@@ -81,8 +81,14 @@ matrix:
       after_script:
     - env: TEST=check-changelog
       before_script:
+        - git fetch --unshallow
+        ### Travis branch bug workaround
+        - git checkout master
+        - git checkout -
       install: 
-      script: src/testing/travis/check-changelog.sh
+      script:
+        - cd src/testing/travis/
+        - ./check-changelog.sh
       after_script:
 
 ################################################################################
