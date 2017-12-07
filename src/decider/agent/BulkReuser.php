@@ -54,11 +54,11 @@ class BulkReuser extends Object
     return array_unique($bulkIds);
   }
   
-  public function rerunBulkAndDeciderOnUpload($uploadId, $groupId, $userId, $jobId) {
-    $bulkIds = $this->getBulkIds($uploadId, $groupId, $userId);
-    if (count($bulkIds) == 0) {
-      return 0;
-    }
+  public function rerunBulkAndDeciderOnUpload($uploadId, $groupId, $userId, $bulkId, $dependency) {
+//    $bulkIds = $this->getBulkIds($uploadId, $groupId, $userId);
+//    if (count($bulkIds) == 0) {
+//      return 0;
+//    }
     /* @var $uploadDao UploadDao */
     $uploadDao = $GLOBALS['container']->get('dao.upload');
     $topItem = $uploadDao->getUploadParent($uploadId);
@@ -72,19 +72,40 @@ class BulkReuser extends Object
             ."SELECT $1 as lrb_fk,rf_fk,removing FROM license_set_bulk WHERE lrb_fk=$2";
     $this->dbManager->prepare($stmt=__METHOD__.'cloneBulk', $sql);
     $this->dbManager->prepare($stmtLic=__METHOD__.'cloneBulkLic', $sqlLic);
-    foreach($bulkIds as $bulkId) {
-      $res = $this->dbManager->execute($stmt,array($userId,$groupId,$uploadId,$topItem, $bulkId));
-      $row = $this->dbManager->fetchArray($res);
-      $this->dbManager->freeResult($res);
-      $resLic = $this->dbManager->execute($stmtLic,array($row['lrb_pk'],$row['lrb_origin']));
-      $this->dbManager->freeResult($resLic);  
-      $dependecies[] = array('name' => 'agent_monk_bulk', 'args' => $row['lrb_pk'], AgentPlugin::PRE_JOB_QUEUE=>array('agent_decider'));
-    }
+ // foreach($bulkIds as $bulkId) {
+    $res = $this->dbManager->execute($stmt,array($userId,$groupId,$uploadId,$topItem, $bulkId));
+    $row = $this->dbManager->fetchArray($res);
+    $this->dbManager->freeResult($res);
+    $resLic = $this->dbManager->execute($stmtLic,array($row['lrb_pk'],$row['lrb_origin']));
+    $this->dbManager->freeResult($resLic);
+//  $dependecies[] = array('name' => 'agent_monk_bulk', 'args' => $row['lrb_pk'], AgentPlugin::PRE_JOB_QUEUE=>array('agent_decider'));
+//    if(!empty($dependency)){
+//      $job_pk = $dependency;
+//    }else{
+      $upload = $uploadDao->getUpload($uploadId);
+      $uploadName = $upload->getFilename();
+      $job_pk = JobAddJob($userId, $groupId, $uploadName, $uploadId);
+//    }
+    /** @var DeciderJobAgentPlugin $deciderPlugin */
+    $deciderPlugin = plugin_find("agent_deciderjob");
+   // if(!empty($dependency)){
+   //   $dependecies = array(array('name' => 'agent_monk_bulk', 'args' => $row['lrb_pk'], AgentPlugin::PRE_JOB_QUEUE=>array('agent_deciderjob')));
+   // }else{
+      $dependecies = array(array('name' => 'agent_monk_bulk', 'args' => $row['lrb_pk']));
+    //}
     $errorMsg = '';
-    $jqId = $deciderPlugin->AgentAdd($jobId, $uploadId, $errorMsg, $dependecies);
+    $jqId = $deciderPlugin->AgentAdd($job_pk, $uploadId, $errorMsg, $dependecies);
+
     if (!empty($errorMsg))
     {
-      throw new Exception($errorMsg);
+      throw new Exception(str_replace('<br>', "\n", $errorMsg));
+    }
+    if(!empty($dependency)){
+      $sql = "SELECT jq_pk FROM jobqueue, job WHERE job_pk=jq_job_fk AND jq_type = $1 AND job_upload_fk = $2 ORDER BY jq_pk DESC LIMIT 1";
+      $duplicatedNewRef = $this->dbManager->getSingleRow($sql, array('monkbulk', $uploadId), __METHOD__."getPreviousDeciderJobId");
+      $sql = "INSERT INTO jobdepends (jdep_jq_fk,jdep_jq_depends_fk) VALUES ($1, $2)";
+      $this->dbManager->prepare($stmt=__METHOD__.'insertDependency', $sql);
+      $res = $this->dbManager->execute($stmt,array($duplicatedNewRef['jq_pk'], $dependency));
     }
     return $jqId;
   }
