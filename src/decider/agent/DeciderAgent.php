@@ -53,6 +53,7 @@ class DeciderAgent extends Agent
   private $clearingDao;
   /** @var HighlightDao */
   private $highlightDao;
+  private $jobDao;
   /** @var DecisionTypes */
   private $decisionTypes;
   /** @var LicenseMap */
@@ -67,6 +68,7 @@ class DeciderAgent extends Agent
     $this->uploadDao = $this->container->get('dao.upload');
     $this->clearingDao = $this->container->get('dao.clearing');
     $this->highlightDao = $this->container->get('dao.highlight');
+    $this->jobDao = $this->container->get('dao.job');
     $this->decisionTypes = $this->container->get('decision.types');
     $this->clearingDecisionProcessor = $this->container->get('businessrules.clearing_decision_processor');
     $this->agentLicenseEventProcessor = $this->container->get('businessrules.agent_license_event_processor');
@@ -98,6 +100,9 @@ class DeciderAgent extends Agent
       $jqId=0;
       foreach($bulkIds as $bulkId) {
         $jqId = $bulkReuser->rerunBulkAndDeciderOnUpload($uploadId, $this->groupId, $this->userId, $bulkId, $jqId);
+        while(!$this->jobDao->getJobStatus($jqId)){
+          sleep(30);
+        }
       }
     }
     

@@ -82,4 +82,18 @@ class JobDao extends Object
 
     return $result;
   }
+  
+  public function getJobStatus($jqId){
+    $sql = "SELECT jq_endtext FROM jobqueue where jq_pk=$1";
+    $jobStatus = $this->dbManager->getSingleRow($sql, array($jqId));
+    $test = array($jobStatus);
+    file_put_contents("/media/shared/error.log", print_r($test, TRUE), FILE_APPEND|LOCK_EX);
+    if(strcmp($jobStatus['jq_endtext'],"Completed") === 0){
+      return true;
+    }
+    else{
+      return false;
+    }
+  }
+
 }
