@@ -87,7 +87,35 @@ function createTable{{ table.type }}() {
     });
   });
 
+  $('#replaceSelected{{ table.type }}').click(function () {
+    $("input:checkbox[class=deleteBySelect{{ table.type }}]:checked").each(function () {
+      currentValue = $(this).val();
+      var currUploadData = currentValue.split(',');
+      var replaceText = $('#replaceText').val().trim();
+      var replaceIsValid = (replaceText) && !(/^\s*$/.test(replaceText));
+      if(replaceIsValid){
+        updateRows{{ table.type }}(currUploadData[0], currUploadData[1], currUploadData[2], currUploadData[3], replaceText);
+      }
+    });
+  });
+
   return enabledTable;
+}
+
+function updateRows{{ table.type }}(upload, item, hash, kind, replaceText) {
+  $.ajax({
+    type: 'POST',
+    dataType: 'text',
+    url: '?mod=ajax-copyright-hist&action=update&type={{ table.type }}',
+    data: { id : upload + ',' + item + ',' + hash + ',' + kind, value : replaceText },
+      success: function(data) {
+        var updateElement = $("#update{{ table.type }}" + hash);
+        updateElement.html("updating...");
+        updateElement.show();
+        createTableBase{{ table.type }};
+      },
+      error: function() { alert('error'); }
+  });
 }
 
 function delete{{ table.type }}(upload, item, hash, kind) {
