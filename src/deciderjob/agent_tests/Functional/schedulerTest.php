@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright (C) 2014-2015, Siemens AG
+Copyright (C) 2014-2015,2019 Siemens AG
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -207,7 +207,7 @@ class SchedulerTest extends \PHPUnit\Framework\TestCase
 
     $jobId = 42;
 
-    $licenseRef1 = $this->licenseDao->getLicenseByShortName("GPL-3.0")->getRef();
+    $licenseRef1 = $this->licenseDao->getLicenseByShortName("SPL-1.0")->getRef();
     $licenseRef2 = $this->licenseDao->getLicenseByShortName("Glide")->getRef();
 
     $addedLicenses = array($licenseRef1, $licenseRef2);
@@ -274,7 +274,7 @@ class SchedulerTest extends \PHPUnit\Framework\TestCase
     $this->setUpTables();
     $this->setUpRepo();
 
-    $licenseRef1 = $this->licenseDao->getLicenseByShortName("GPL-3.0")->getRef();
+    $licenseRef1 = $this->licenseDao->getLicenseByShortName("SPL-1.0")->getRef();
 
     $licId1 = $licenseRef1->getId();
 
@@ -418,7 +418,7 @@ class SchedulerTest extends \PHPUnit\Framework\TestCase
 
     $jobId = 42;
 
-    $licenseRef1 = $this->licenseDao->getLicenseByShortName("GPL-3.0")->getRef();
+    $licenseRef1 = $this->licenseDao->getLicenseByShortName("SPL-1.0")->getRef();
     $licenseRef2 = $this->licenseDao->getLicenseByShortName("Glide")->getRef();
 
     $agentLicId = $this->licenseDao->getLicenseByShortName("Adaptec")->getRef()->getId();
