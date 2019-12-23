@@ -36,6 +36,7 @@ class UploadTreeProxy extends DbViewProxy
   const OPT_SCAN_REF = 'scanRef';
   const OPT_CONCLUDE_REF = 'conRef';
   const OPT_SKIP_ALREADY_CLEARED = 'alreadyCleared';
+  const OPT_ONLY_MAIN_LICENSE = 'onlyMainLicense';
 
   /** @var string */
   private $uploadTreeTableName;
@@ -115,10 +116,10 @@ class UploadTreeProxy extends DbViewProxy
       $this->dbViewName .= "_".self::OPT_SKIP_ALREADY_CLEARED;
       $groupAlias = $this->addParamAndGetExpr('groupId', $options[self::OPT_GROUP_ID]);
       if (array_key_exists(self::OPT_RANGE, $options)) {
-        $filter .= ' AND '.self::getQueryCondition(self::OPT_SKIP_ALREADY_CLEARED, $groupAlias, $agentFilter);
+        $filter .= ' AND '.self::getQueryCondition(self::OPT_SKIP_ALREADY_CLEARED, $options, $groupAlias, $agentFilter);
       } elseif (array_key_exists(self::OPT_SKIP_ALREADY_CLEARED, $options) && array_key_exists(self::OPT_GROUP_ID, $options)
               && array_key_exists(self::OPT_AGENT_SET, $options) && array_key_exists(self::OPT_REALPARENT, $options)) {
-        $childFilter = self::getQueryCondition(self::OPT_SKIP_ALREADY_CLEARED, $groupAlias, $agentFilter);
+        $childFilter = self::getQueryCondition(self::OPT_SKIP_ALREADY_CLEARED, $options, $groupAlias, $agentFilter);
         $filter .= ' AND EXISTS(SELECT * FROM '.$this->uploadTreeTableName.' utc WHERE utc.upload_fk='.$this->uploadId
                 . ' AND (utc.lft BETWEEN ut.lft AND ut.rgt) AND utc.ufile_mode&(3<<28)=0 AND '
                    .preg_replace('/([a-z])ut\./', '\1utc.', $childFilter).')';
@@ -229,7 +230,7 @@ class UploadTreeProxy extends DbViewProxy
       case "noCopyright":
       case "noEcc":
 
-        $queryCondition = self::getQueryCondition($skipThese, $groupId, $agentFilter)." ".$additionalCondition;
+        $queryCondition = self::getQueryCondition($skipThese, $options, $groupId, $agentFilter)." ".$additionalCondition;
         if ('uploadtree' === $uploadTreeTableName || 'uploadtree_a' == $uploadTreeTableName) {
           $queryCondition = "ut.upload_fk=$uploadId AND ($queryCondition)";
         }
@@ -270,11 +271,15 @@ class UploadTreeProxy extends DbViewProxy
    * @param $skipThese
    * @return string
    */
-  private static function getQueryCondition($skipThese, $groupId = null, $agentFilter='')
+  private static function getQueryCondition($skipThese, $options, $groupId = null, $agentFilter='')
   {
-    $conditionQueryHasLicense = "(EXISTS (SELECT 1 FROM license_ref lr INNER JOIN license_file lf"
-      . " ON lf.rf_fk=lr.rf_pk WHERE rf_shortname NOT IN ('No_license_found', 'Void') AND lf.pfile_fk = ut.pfile_fk $agentFilter LIMIT 1)
-        OR EXISTS (SELECT 1 FROM clearing_decision AS cd WHERE cd.group_fk = $groupId AND ut.uploadtree_pk = cd.uploadtree_fk LIMIT 1))";
+    $only = "";
+    if (array_key_exists(self::OPT_ONLY_MAIN_LICENSE, $options)) {
+      $only = "ONLY";
+    }
+    $conditionQueryHasLicense = "(EXISTS (SELECT 1 FROM $only license_ref lr INNER JOIN license_file lf"
+      . " ON lf.rf_fk=lr.rf_pk AND lf.pfile_fk = ut.pfile_fk $agentFilter WHERE rf_shortname NOT IN ('No_license_found','Void'))
+        OR EXISTS (SELECT 1 FROM clearing_decision AS cd WHERE cd.group_fk = $groupId AND ut.uploadtree_pk = cd.uploadtree_fk))";
 
     switch ($skipThese) {
       case "noLicense":
@@ -288,7 +293,7 @@ FROM (
   SELECT * FROM clearing_decision cd
   WHERE cd.group_fk = $groupId
   AND (
-    ut.uploadtree_pk = cd.uploadtree_fk OR cd.pfile_fk = ut.pfile_fk AND cd.scope=".DecisionScopes::REPO."
+    ut.uploadtree_pk = cd.uploadtree_fk OR (cd.pfile_fk = ut.pfile_fk AND cd.scope=".DecisionScopes::REPO.")
   )
 ) AS filtered_clearing_decision ORDER BY rnum DESC LIMIT 1";
         return " $conditionQueryHasLicense

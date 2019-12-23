@@ -298,17 +298,23 @@ class AjaxExplorer extends DefaultPlugin
     /* Determine link for containers */
     $isContainer = Iscontainer($child['ufile_mode']);
     if ($isContainer && !$isFlat) {
-      $fatChild = $this->uploadDao->getFatItemArray($child['uploadtree_pk'], $uploadId, $this->uploadtree_tablename);
+      $fatChild = $this->uploadDao->getFatItemArray($child['uploadtree_pk'],
+        $uploadId, $this->uploadtree_tablename);
       $uploadtree_pk = $fatChild['item_id'];
       $childUploadTreeId = $uploadtree_pk;
-      $upload = $this->uploadDao->getUploadEntry($uploadtree_pk, $this->uploadtree_tablename);
+      $upload = $this->uploadDao->getUploadEntry($uploadtree_pk,
+        $this->uploadtree_tablename);
       $fileId = $upload['pfile_fk'];
-      $parent = $upload['realparent'];
-      $parentItemTreeBound = $this->uploadDao->getItemTreeBounds($parent, $this->uploadtree_tablename);
 
-      $pfileLicenses = array_replace($pfileLicenses,
-        $this->updateTheFindingsAndDecisions($latestSuccessfulAgentIds, $isFlat,
-          $groupId, $editedMappedLicenses, $parentItemTreeBound));
+      if ($child['ufile_name'] != $fatChild['ufile_name']
+        && $fatChild['num_children'] == 0) {
+        // Folder contains only one file. Update the license findings
+        $parentItemTreeBound = $this->uploadDao->getItemTreeBounds(
+          $upload['realparent'], $this->uploadtree_tablename);
+        $pfileLicenses = array_replace($pfileLicenses,
+          $this->updateTheFindingsAndDecisions($latestSuccessfulAgentIds,
+            $isFlat, $groupId, $editedMappedLicenses, $parentItemTreeBound));
+      }
 
       $linkUri = "$uri&item=" . $uploadtree_pk;
       if ($selectedAgentId) {
@@ -388,21 +394,21 @@ class AjaxExplorer extends DefaultPlugin
       $fileListLinks .= "[<a href='#' onclick='openBulkModal($childUploadTreeId)' >$getTextEditBulk</a>]";
     }
     $fileListLinks .= "<input type='checkbox' id='selectedForIrrelevant' value='".$childUploadTreeId."'>";
-    $filesThatShouldStillBeCleared = array_key_exists($childItemTreeBounds->getItemId()
+    $filesThatAreCleared = array_key_exists($childItemTreeBounds->getItemId()
         , $this->filesThatShouldStillBeCleared) ? $this->filesThatShouldStillBeCleared[$childItemTreeBounds->getItemId()] : 0;
 
-    $filesToBeCleared = array_key_exists($childItemTreeBounds->getItemId()
+    $filesThatNeedToBeCleared = array_key_exists($childItemTreeBounds->getItemId()
         , $this->filesToBeCleared) ? $this->filesToBeCleared[$childItemTreeBounds->getItemId()] : 0;
 
-    $filesCleared = $filesToBeCleared - $filesThatShouldStillBeCleared;
+    $filesCleared = $filesThatNeedToBeCleared - $filesThatAreCleared;
 
-    $img = ($filesCleared == $filesToBeCleared) ? 'green' : 'red';
+    $img = ($filesCleared == $filesThatNeedToBeCleared) ? 'green' : 'red';
 
     // override green/red flag with yellow flag in case of single file with decision type "To Be Discussed"
     $isDecisionTBD = $this->clearingDao->isDecisionTBD($childUploadTreeId, $groupId);
     $img = $isDecisionTBD ? 'yellow' : $img;
 
-    return array($fileName, $licenseList, $editedLicenseList, $img, "$filesCleared/$filesToBeCleared", $fileListLinks);
+    return array($fileName, $licenseList, $editedLicenseList, $img, "$filesCleared/$filesThatNeedToBeCleared", $fileListLinks);
   }
 
   /**
@@ -443,7 +449,8 @@ class AjaxExplorer extends DefaultPlugin
           UploadTreeProxy::OPT_SKIP_THESE => UploadTreeProxy::OPT_SKIP_ALREADY_CLEARED,
           UploadTreeProxy::OPT_ITEM_FILTER => "AND (lft BETWEEN " .
           $itemTreeBounds->getLeft() . " AND " . $itemTreeBounds->getRight() . ")",
-          UploadTreeProxy::OPT_GROUP_ID => $groupId
+          UploadTreeProxy::OPT_GROUP_ID => $groupId,
+          UploadTreeProxy::OPT_ONLY_MAIN_LICENSE => true
         ), $itemTreeBounds->getUploadTreeTableName(),
         $viewName = 'already_cleared_uploadtree' . $itemTreeBounds->getUploadId());
 
@@ -470,7 +477,8 @@ class AjaxExplorer extends DefaultPlugin
           UploadTreeProxy::OPT_SKIP_THESE => "noLicense",
           UploadTreeProxy::OPT_ITEM_FILTER => "AND (lft BETWEEN " .
           $itemTreeBounds->getLeft() . " AND " . $itemTreeBounds->getRight() . ")",
-          UploadTreeProxy::OPT_GROUP_ID => $groupId
+          UploadTreeProxy::OPT_GROUP_ID => $groupId,
+          UploadTreeProxy::OPT_ONLY_MAIN_LICENSE => true
         ), $itemTreeBounds->getUploadTreeTableName(),
         $viewName = 'no_license_uploadtree' . $itemTreeBounds->getUploadId());
       $this->noLicenseUploadTreeView->materialize();

@@ -114,10 +114,15 @@ class ui_browse_license extends DefaultPlugin
     }
 
     $item = intval($request->get("item"));
+    $this->uploadtree_tablename = $this->uploadDao->getUploadtreeTableName($upload);
+    $itemTreeBounds = $this->uploadDao->getItemTreeBounds($item, $this->uploadtree_tablename);
+    $left = $itemTreeBounds->getLeft();
+    if (empty($left)) {
+      return $this->flushContent(_("Job unpack/adj2nest hasn't completed."));
+    }
 
     $vars['baseuri'] = Traceback_uri();
     $vars['uploadId'] = $upload;
-    $this->uploadtree_tablename = $this->uploadDao->getUploadtreeTableName($upload);
     if ($request->get('show')=='quick') {
       $item = $this->uploadDao->getFatItemId($item,$upload,$this->uploadtree_tablename);
     }
@@ -127,11 +132,6 @@ class ui_browse_license extends DefaultPlugin
       -1, '', '', $this->uploadtree_tablename);
     $vars['licenseArray'] = $this->licenseDao->getLicenseArray();
 
-    $itemTreeBounds = $this->uploadDao->getItemTreeBounds($item, $this->uploadtree_tablename);
-    $left = $itemTreeBounds->getLeft();
-    if (empty($left)) {
-      return $this->flushContent(_("Job unpack/adj2nest hasn't completed."));
-    }
     $histVars = $this->showUploadHist($itemTreeBounds);
     if (is_a($histVars, 'Symfony\\Component\\HttpFoundation\\RedirectResponse')) {
       return $histVars;
