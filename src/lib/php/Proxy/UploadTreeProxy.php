@@ -50,12 +50,16 @@ class UploadTreeProxy extends DbViewProxy
    * @param array $options (OPT_* supported)
    * @param string $uploadTreeTableName
    */
-  public function __construct($uploadId, $options, $uploadTreeTableName, $uploadTreeViewName=null)
+  public function __construct($uploadId, $options, $uploadTreeTableName, $uploadTreeViewName=null, $quickPatch = false)
   {
     $this->uploadId = $uploadId;
     $this->uploadTreeTableName = $uploadTreeTableName;
     $dbViewName = $uploadTreeViewName ?: 'UploadTreeView'.(isset($this->dbViewName) ?: '');
-    $dbViewQuery = $this->createUploadTreeViewQuery($options, $uploadTreeTableName);
+    if ($quickPatch) {
+      $dbViewQuery = $this->getPatchQuery($options);
+    } else {
+      $dbViewQuery = $this->createUploadTreeViewQuery($options, $uploadTreeTableName);
+    }
     parent::__construct($dbViewQuery, $dbViewName);
   }
 
@@ -409,5 +413,44 @@ FROM (
   public function getParams()
   {
     return $this->params;
+  }
+
+  private function getPatchQuery($options)
+  {
+    $uploadTreeTable = $this->uploadTreeTableName;
+    $agentFile = $this->getAgentFilter($options, $this->uploadId);
+    $globalScope = DecisionScopes::REPO;
+    $groupAlias = $options[self::OPT_GROUP_ID];
+    $uploadAlias = $this->uploadId;
+
+    $condition = "";
+    if ($options[self::OPT_SKIP_THESE] != "noLicense") {
+      $condition = "
+OR cd.decision_type IN (" . DecisionTypes::IRRELEVANT . ", " .
+        DecisionTypes::IDENTIFIED . ")";
+    }
+
+    return "(WITH allDecs AS (
+  SELECT DISTINCT ON (ut.uploadtree_pk) ut.* FROM $uploadTreeTable AS ut
+    LEFT JOIN license_file AS lf
+      ON lf.pfile_fk = ut.pfile_fk
+      $agentFile
+      AND lf.rf_fk NOT IN (SELECT rf_pk FROM license_ref
+        WHERE rf_shortname IN ('No_license_found', 'Void')
+      )
+      AND lf.rf_fk IS NOT NULL
+    LEFT JOIN clearing_decision AS cd ON
+      ((ut.uploadtree_pk = cd.uploadtree_fk)
+      OR (ut.pfile_fk = cd.pfile_fk AND cd.scope = $globalScope))
+      AND cd.group_fk = $groupAlias
+  WHERE ut.upload_fk = $uploadAlias AND (
+    CASE
+      WHEN (lf.fl_pk IS NULL AND cd.clearing_decision_pk IS NULL)$condition
+        THEN FALSE
+        ELSE TRUE
+      END
+  ) " . $options[self::OPT_ITEM_FILTER] . "
+)
+SELECT DISTINCT ON (uploadtree_pk) * FROM allDecs)";
   }
 }
