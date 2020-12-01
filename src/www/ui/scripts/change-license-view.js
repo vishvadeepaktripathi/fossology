@@ -38,7 +38,6 @@ function openUserModal() {
   $('#bulkModal').hide();
   $('#ClearingHistoryDataModal').hide();
   $('#userModal').toggle();
-  $("#globalDecision").prop("checked", false);
   if ($('#userModal').is(":visible")) {
     $('#licenseSelectionTable_filter label input').focus();
   }
