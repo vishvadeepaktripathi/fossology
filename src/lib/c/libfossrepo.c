@@ -61,7 +61,7 @@ int RepGroup; /** the repository group ID for setgid() */
 /*!
  \note This is an internal function.
 
- \brief Simple check to see if the string S is valid filename.  
+ \brief Simple check to see if the string S is valid filename.
 
  A valid name is composed of only alphanumerics, and `"&%_=+-"`
  \n Used for types, hostnames, and filenames.
@@ -84,7 +84,7 @@ int _RepCheckType(const char* S)
 /*!
  \note This is an internal function.
 
- \brief Simple check to see if the string is valid.  
+ \brief Simple check to see if the string is valid.
 
  Valid strings only contain alphanumerics, and `"@%_.=+-"`.
  \n Used for types, hostnames, and filenames.
@@ -422,7 +422,6 @@ int _RepMkDirs(char* Fname)
   char Dir[FILENAME_MAX + 1];
   int i;
   int rc = 0;
-  mode_t Mask;
 #if GROUP
   gid_t Gid;
 #endif
@@ -434,7 +433,6 @@ int _RepMkDirs(char* Fname)
     if (Dir[i] == '/')
     {
       Dir[i] = '\0';
-      Mask = umask(0000); /* mode: 0777 */
 #if GROUP
       Gid = getegid();
       setegid(RepGroup);
@@ -443,7 +441,6 @@ int _RepMkDirs(char* Fname)
 #if GROUP
       setegid(Gid);
 #endif
-      umask(Mask);
       if (rc && (errno == EEXIST)) rc = 0;
       Dir[i] = '/';
       if (rc)
@@ -530,8 +527,8 @@ int fo_RepExist(char* Type, char* Filename)
  This is a replacement for fo_RepExist().
 
  \param Type is the type of data.
- \param Filename 
- \return 0=exists, errno=not exists, -1 = internal errors. 
+ \param Filename
+ \return 0=exists, errno=not exists, -1 = internal errors.
  A message is also written to stderr for internal errors (bad inputs, etc).
 
  \test
@@ -608,7 +605,7 @@ int fo_RepRemove(char* Type, char* Filename)
 /*!
  \brief Perform an fclose.
  \param F File handler
- \return 0 if success.  On error, EOF is returned and global errno is set. 
+ \return 0 if success.  On error, EOF is returned and global errno is set.
  */
 int fo_RepFclose(FILE* F)
 {
@@ -661,7 +658,6 @@ FILE* fo_RepFwriteTmp(char* Type, char* Filename, char* Ext)
 {
   FILE* F = NULL;
   char* Fname;
-  mode_t Mask;
 #if GROUP
   gid_t Gid;
 #endif
@@ -689,7 +685,6 @@ FILE* fo_RepFwriteTmp(char* Type, char* Filename, char* Ext)
     return (NULL);
   }
   _RepUpdateTime(Fname);
-  Mask = umask(0117); /* mode: 0660 */
 #if GROUP
   Gid = getegid();
   setegid(RepGroup);
@@ -702,11 +697,10 @@ FILE* fo_RepFwriteTmp(char* Type, char* Filename, char* Ext)
     free(Fname);
     return (NULL);
   }
-  chmod(Fname, S_ISGID | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP); /* when umask fails */
+  chmod(Fname, S_ISGID | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 #if GROUP
   setegid(Gid);
 #endif
-  umask(Mask);
   free(Fname);
   return (F);
 } /* fo_RepFwriteTmp() */

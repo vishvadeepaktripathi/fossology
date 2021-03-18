@@ -91,11 +91,12 @@ if ($cached) {
 
   if ($cacheDir && is_dir($cacheDir)) {
     $dumper = new PhpDumper($container);
-    umask(0027);
+    $oldmask = umask(0027);
     file_put_contents($cacheFile,
       $dumper->dump(array(
         'class' => $containerClassName
       )));
+    umask($oldmask);
   }
 }
 
