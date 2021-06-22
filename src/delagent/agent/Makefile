@@ -20,8 +20,10 @@ VARS = $(TOP)/Makefile.conf
 DEPS = $(TOP)/Makefile.deps
 include $(VARS)
 
-CFLAGS_LOCAL = $(FO_CFLAGS) $(shell libgcrypt-config --cflags)
-LDFLAGS_LOCAL = $(FO_LDFLAGS) -lpq $(shell libgcrypt-config --libs)
+CFLAGS_LOCAL = $(FO_CFLAGS) $(shell libgcrypt-config --cflags) \
+							 $(shell pkg-config --cflags botan-2)
+LDFLAGS_LOCAL = $(FO_LDFLAGS) -lpq $(shell libgcrypt-config --libs) \
+							 $(shell pkg-config --libs botan-2)
 CONFDIR = $(DESTDIR)$(SYSCONFDIR)
 
 EXE = delagent

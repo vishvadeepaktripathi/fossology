@@ -23,6 +23,9 @@
  * delagent: Remove an upload from the DB and repository
  *
  */
+
+#include <botan/ffi.h>
+
 #include "delagent.h"
 
 int Verbose = 0;
@@ -111,9 +114,10 @@ int authentication(char *user, char *password, int *userId, int *userPerm)
   char SQL[MAXSQL] = {0};
   PGresult *result;
   char user_seed[myBUFSIZ] = {0};
-  char pass_hash_valid[41] = {0};
+  char pass_hash_valid[myBUFSIZ] = {0};
   unsigned char pass_hash_actual_raw[21] = {0};
   char pass_hash_actual[41] = {0};
+  int hash_match = -1;
 
   /** get user_seed, user_pass on one specified user */
   snprintf(SQL,MAXSQL,"SELECT user_seed, user_pass, user_perm, user_pk from users where user_name=$1;");
@@ -134,6 +138,10 @@ int authentication(char *user, char *password, int *userId, int *userPerm)
   *userPerm = atoi(PQgetvalue(result, 0, 2));
   *userId = atoi(PQgetvalue(result, 0, 3));
   PQclear(result);
+  if (pass_hash_valid[0])
+  {
+    hash_match = botan_bcrypt_is_valid(password, pass_hash_valid);
+  }
   if (user_seed[0] && pass_hash_valid[0])
   {
     strcat(user_seed, password);  // get the hash code on seed+pass
@@ -143,6 +151,10 @@ int authentication(char *user, char *password, int *userId, int *userPerm)
   else
   {
     return -1;
+  }
+  if (hash_match == 0)
+  {
+    return 0;
   }
   int i = 0;
   char temp[256] = {0};

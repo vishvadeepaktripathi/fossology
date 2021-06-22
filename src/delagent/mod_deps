@@ -68,6 +68,7 @@ fi
 
 # figure out what distro we're on
 DISTRO=$(lsb_release --id --short)
+CODENAME=$(lsb_release --codename --short)
 
 ########################################################################
 
@@ -77,10 +78,20 @@ if [[ $BUILDTIME ]]; then
     Debian|Ubuntu)
       apt-get $YesOpt install \
         libgcrypt20-dev
+      case "$CODENAME" in
+        jessie)
+          apt-get $YesOpt install \
+            libbotan1.10-dev
+          ;;
+        *)
+          apt-get $YesOpt install \
+            libbotan-2-dev
+          ;;
+      esac
       ;;
     RedHatEnterprise*|CentOS|Fedora)
       yum $YesOpt install \
-        libgcrypt-devel
+        libgcrypt-devel botan2-devel
       ;;
   esac
 fi
@@ -91,10 +102,32 @@ if [[ $RUNTIME ]]; then
     Debian|Ubuntu)
       apt-get $YesOpt install \
         libgcrypt20
+      case "$CODENAME" in
+        jessie)
+          apt-get $YesOpt install \
+            libbotan-1.10-0
+          ;;
+        stretch|bionic)
+          apt-get $YesOpt install \
+            libbotan-2-4
+          ;;
+        buster)
+          apt-get $YesOpt install \
+            libbotan-2-9
+          ;;
+        focal)
+          apt-get $YesOpt install \
+            libbotan-2-12
+          ;;
+        testing|sid)
+          apt-get $YesOpt install \
+            libbotan-2-17
+          ;;
+      esac
       ;;
     RedHatEnterprise*|CentOS|Fedora)
       yum $YesOpt install \
-        libgcrypt
+        libgcrypt botan2
       ;;
   esac
 fi
