@@ -76,10 +76,8 @@ if [[ $BUILDTIME ]]; then
   echo "*** Installing $DISTRO buildtime dependencies ***";
   case "$DISTRO" in
     Debian|Ubuntu)
-      apt-get $YesOpt install \
-        libgcrypt20-dev
       case "$CODENAME" in
-        jessie)
+        jessie|stretch)
           apt-get $YesOpt install \
             libbotan1.10-dev
           ;;
@@ -91,7 +89,7 @@ if [[ $BUILDTIME ]]; then
       ;;
     RedHatEnterprise*|CentOS|Fedora)
       yum $YesOpt install \
-        libgcrypt-devel botan2-devel
+        botan2-devel
       ;;
   esac
 fi
@@ -100,14 +98,16 @@ if [[ $RUNTIME ]]; then
   echo "*** Installing $DISTRO runtime dependencies ***";
   case "$DISTRO" in
     Debian|Ubuntu)
-      apt-get $YesOpt install \
-        libgcrypt20
       case "$CODENAME" in
         jessie)
           apt-get $YesOpt install \
             libbotan-1.10-0
           ;;
-        stretch|bionic)
+        stretch)
+          apt-get $YesOpt install \
+            libbotan-1.10-1
+          ;;
+        bionic)
           apt-get $YesOpt install \
             libbotan-2-4
           ;;
@@ -127,7 +127,7 @@ if [[ $RUNTIME ]]; then
       ;;
     RedHatEnterprise*|CentOS|Fedora)
       yum $YesOpt install \
-        libgcrypt botan2
+        botan2
       ;;
   esac
 fi
